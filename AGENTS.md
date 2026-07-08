@@ -24,11 +24,14 @@
 - DB 참조 무결성, 권한, 상태 전이는 Service 레이어에서 검증한다.
 - Spring Security는 초기 구현에서 사용하지 않는다.
 - 카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현한다.
+- 백엔드 자체 access token은 JWT로 발급하고 `Authorization: Bearer {accessToken}` 헤더로 검증한다.
 
 ## 패키지 구조 기준
 
+기준 루트 패키지는 `com.onmom`이다. 프로젝트 생성 초기 패키지가 이와 다르면, 도메인 구현을 늘리기 전에 이 기준으로 정리한다.
+
 ```text
-kr.ac.knu.onmom
+com.onmom
 ├── global
 │   ├── config
 │   ├── exception
@@ -100,7 +103,8 @@ Cursor 목록 응답:
 ## 작업 전 체크리스트
 
 - 관련 도메인의 기존 구조를 먼저 확인한다.
-- `outputs/onmom_api_guidelines.md`의 API 규칙을 따른다.
-- `outputs/onmom_db_design.md`의 테이블과 상태값을 기준으로 구현한다.
+- `docs/onmom_api_guidelines.md`의 API 규칙을 따른다.
+- `docs/onmom_db_design.md`의 테이블과 상태값을 기준으로 구현한다.
 - 새 API를 추가하면 요청 DTO, 응답 DTO, 에러 코드, 권한 조건을 함께 정리한다.
 - 새 목록 조회 API는 offset/page 방식이 아니라 cursor 방식으로 구현한다.
+- cursor는 클라이언트가 해석하지 않는 문자열로 취급하고, 기본 정렬은 `createdAt desc, id desc`를 사용한다.

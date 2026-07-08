@@ -35,7 +35,7 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - Docker Compose Support
 - Testcontainers
 
-카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현합니다.
+카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현합니다. 로그인 성공 후 백엔드는 자체 access token을 JWT로 발급합니다.
 
 ## 문서
 
@@ -57,11 +57,14 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - 트랜잭션 경계는 Service에 둡니다.
 - DB는 `FOREIGN KEY`, `CHECK`, MySQL `ENUM` 없이 설계합니다.
 - DB 상태값은 `VARCHAR`로 저장하고 Java enum과 애플리케이션 검증으로 관리합니다.
+- 자체 access token은 JWT로 발급하고 `Authorization: Bearer {accessToken}` 헤더로 검증합니다.
 
 ## 권장 패키지 구조
 
+기준 루트 패키지는 `com.onmom`입니다. 프로젝트 생성 초기 패키지가 이와 다르면, 도메인 구현을 늘리기 전에 이 기준으로 정리합니다.
+
 ```text
-kr.ac.knu.onmom
+com.onmom
 ├── global
 │   ├── config
 │   ├── exception
@@ -143,7 +146,7 @@ GET /api/v1/notifications?size=20
 다음 페이지:
 
 ```http
-GET /api/v1/notifications?cursor=100&size=20
+GET /api/v1/notifications?cursor=eyJjcmVhdGVkQXQiOiIyMDI2LTA3LTA5VDEwOjAwOjAwLjAwMFoiLCJpZCI6MTAwfQ&size=20
 ```
 
 기본 규칙:
@@ -151,7 +154,10 @@ GET /api/v1/notifications?cursor=100&size=20
 - `size` 기본값은 20입니다.
 - 최대 `size`는 100을 넘지 않습니다.
 - 정렬은 기본적으로 `createdAt desc, id desc`를 사용합니다.
-- 다음 페이지가 있으면 `nextCursor`를 내려줍니다.
+- `cursor`는 클라이언트가 해석하지 않는 opaque string입니다.
+- 서버는 cursor 내부에 마지막 항목의 `createdAt`과 `id`를 담습니다.
+- 다음 페이지가 있으면 `nextCursor`를 문자열로 내려줍니다.
+- 다음 페이지 조회 조건은 `(createdAt < cursorCreatedAt) OR (createdAt = cursorCreatedAt AND id < cursorId)`입니다.
 
 ## DB 정책
 
@@ -174,7 +180,7 @@ AGENTS.md를 먼저 읽고, 그 지침대로 emotion 도메인의 감정 기록 
 또는:
 
 ```text
-outputs/onmom_api_guidelines.md와 outputs/onmom_db_design.md를 읽고,
+docs/onmom_api_guidelines.md와 docs/onmom_db_design.md를 읽고,
 온맘 백엔드 규칙에 맞게 notification 도메인의 cursor 목록 조회 API를 구현해줘.
 ```
 
@@ -197,8 +203,9 @@ outputs/onmom_api_guidelines.md와 outputs/onmom_db_design.md를 읽고,
 ```text
 AGENTS.md
 README.md
-outputs/
-├── V1__create_onmom_schema.sql
+docs/
 ├── onmom_api_guidelines.md
 └── onmom_db_design.md
+src/main/resources/db/migration/
+└── V1__create_onmom_schema.sql
 ```

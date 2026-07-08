@@ -77,11 +77,11 @@ POST /api/v1/notifications/{notificationId}/read
 권장 패키지:
 
 ```text
-kr.ac.knu.onmom.global.response
+com.onmom.global.response
 ├── ApiResponse.java
 └── ResultType.java
 
-kr.ac.knu.onmom.global.exception
+com.onmom.global.exception
 ├── GlobalExceptionHandler.java
 ├── BusinessException.java
 ├── ErrorCode.java
@@ -164,6 +164,8 @@ public class ApiResponse<T> {
 
 목록 조회는 처음부터 cursor 기반으로 설계합니다. Spring `Pageable`은 page/offset 기반이므로 기본 목록 API에 사용하지 않습니다.
 
+클라이언트는 cursor를 해석하지 않는 opaque string으로 취급합니다. 서버는 기본적으로 마지막 항목의 `createdAt`과 `id`를 cursor에 담아 다음 페이지 조건을 계산합니다.
+
 첫 페이지:
 
 ```http
@@ -173,16 +175,31 @@ GET /api/v1/notifications?size=20
 다음 페이지:
 
 ```http
-GET /api/v1/notifications?cursor=100&size=20
+GET /api/v1/notifications?cursor=eyJjcmVhdGVkQXQiOiIyMDI2LTA3LTA5VDEwOjAwOjAwLjAwMFoiLCJpZCI6MTAwfQ&size=20
 ```
 
 기본 규칙:
 
 ```text
 size = 20
+maxSize = 100
 sort = createdAt desc, id desc
-cursor = 이전 페이지의 마지막 row id
+cursor = Base64URL encoded JSON containing { "createdAt": lastItem.createdAt, "id": lastItem.id }
 ```
+
+첫 페이지는 `cursor`를 보내지 않습니다. 다음 페이지 요청 시 서버는 cursor를 복호화해 `cursorCreatedAt`, `cursorId`를 얻습니다.
+
+기본 조회 조건:
+
+```sql
+WHERE (:cursorCreatedAt IS NULL)
+   OR (created_at < :cursorCreatedAt)
+   OR (created_at = :cursorCreatedAt AND id < :cursorId)
+ORDER BY created_at DESC, id DESC
+LIMIT :sizePlusOne
+```
+
+`sizePlusOne`은 `size + 1`입니다. 조회 결과가 `size + 1`개이면 `hasNext = true`로 판단하고, 응답 `content`에는 앞의 `size`개만 담습니다.
 
 응답:
 
@@ -193,11 +210,12 @@ cursor = 이전 페이지의 마지막 row id
     "content": [
       {
         "id": 100,
+        "createdAt": "2026-07-09T10:00:00.000Z",
         "title": "태동 감소에 대한 불안 표현"
       }
     ],
     "page": {
-      "nextCursor": 99,
+      "nextCursor": "eyJjcmVhdGVkQXQiOiIyMDI2LTA3LTA5VDEwOjAwOjAwLjAwMFoiLCJpZCI6MTAwfQ",
       "size": 20,
       "hasNext": true
     }
@@ -205,7 +223,11 @@ cursor = 이전 페이지의 마지막 row id
 }
 ```
 
-조회 쿼리는 `size + 1`개를 가져와 `hasNext`를 판단합니다. 응답 `content`에는 최대 `size`개만 담고, 다음 페이지가 있으면 마지막 item의 `id`를 `nextCursor`로 내려줍니다.
+응답 `content`에는 최대 `size`개만 담고, 다음 페이지가 있으면 응답에 포함된 마지막 item 기준으로 `nextCursor`를 내려줍니다. 다음 페이지가 없으면 `nextCursor`는 `null`입니다.
+
+도메인 요구상 정렬 기준이 `createdAt desc, id desc`가 아닌 경우에는 cursor에 정렬 기준 컬럼과 `id`를 함께 담아야 합니다. 예를 들어 일정 목록이 `startsAt asc, id asc` 정렬을 사용한다면 cursor는 `{ "startsAt": lastItem.startsAt, "id": lastItem.id }`처럼 구성하고, 조회 조건도 해당 정렬 방향에 맞춰 별도로 정의합니다.
+
+잘못된 cursor 형식, 복호화 실패, 필수 값 누락은 `400 Bad Request`와 `INVALID_CURSOR` 에러 코드로 응답합니다.
 
 ## 7. 인증 정책
 
@@ -218,7 +240,19 @@ cursor = 이전 페이지의 마지막 row id
 3. 백엔드는 카카오 사용자 정보 API를 호출해 `providerUserId`를 확인한다.
 4. `oauth_accounts`에서 기존 사용자를 조회한다.
 5. 없으면 `users`, `oauth_accounts`를 생성한다.
-6. 백엔드는 자체 access token을 발급한다.
+6. 백엔드는 자체 access token을 JWT로 발급한다.
+
+JWT 기본 정책:
+
+```text
+tokenType = Bearer
+subject = userId
+claims.userId = users.id
+claims.role = users.primary_role
+expiresIn = 2 hours
+```
+
+JWT 서명 키는 환경 변수 또는 외부 설정으로 주입하고, 코드나 저장소에 평문으로 커밋하지 않습니다. 초기 구현에서는 refresh token을 발급하지 않습니다. refresh token이 필요해지면 토큰 저장/폐기 정책과 DB 테이블을 별도 설계한 뒤 추가합니다.
 
 로그인 이후 인증이 필요한 API는 아래 헤더를 사용합니다.
 
@@ -226,7 +260,17 @@ cursor = 이전 페이지의 마지막 row id
 Authorization: Bearer {accessToken}
 ```
 
-Spring Security를 쓰지 않는 경우에도 `HandlerInterceptor` 또는 필터에서 토큰을 검증하고 현재 사용자 ID를 요청 컨텍스트에 저장합니다.
+Spring Security를 쓰지 않는 경우에도 `HandlerInterceptor` 또는 필터에서 JWT 서명, 만료 시간, 필수 claim을 검증하고 현재 사용자 ID를 요청 컨텍스트에 저장합니다. 권한 검증은 Service 레이어에서 이 사용자 ID를 기준으로 수행합니다.
+
+인증 실패 에러:
+
+| 상황 | Status | Error code |
+|---|---:|---|
+| Authorization 헤더 없음 | 401 | `AUTHENTICATION_REQUIRED` |
+| Bearer 형식 아님 | 401 | `INVALID_AUTHORIZATION_HEADER` |
+| JWT 서명 invalid | 401 | `INVALID_TOKEN` |
+| JWT 만료 | 401 | `EXPIRED_TOKEN` |
+| JWT 필수 claim 누락 | 401 | `INVALID_TOKEN` |
 
 ## 8. 권한 규칙
 
@@ -240,8 +284,10 @@ FAMILY: family_connections.family_user_id == currentUserId
 
 ## 9. 도메인형 파일 구조
 
+기준 루트 패키지는 `com.onmom`입니다. 프로젝트 생성 초기 패키지가 이와 다르면, 도메인 구현을 늘리기 전에 이 기준으로 정리합니다.
+
 ```text
-kr.ac.knu.onmom
+com.onmom
 ├── global
 │   ├── config
 │   ├── exception

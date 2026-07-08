@@ -1,4 +1,4 @@
-package com.onmom_server;
+package com.onmom;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

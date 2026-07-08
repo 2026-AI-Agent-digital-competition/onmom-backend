@@ -95,11 +95,12 @@ erDiagram
 
 ## 실제 DDL
 
-- [V1__create_onmom_schema.sql](V1__create_onmom_schema.sql)
+- [V1__create_onmom_schema.sql](../src/main/resources/db/migration/V1__create_onmom_schema.sql)
 
 ## 구현 메모
 
 - JPA에서는 DB 컬럼을 `VARCHAR`로 두고 Java `enum`과 `@Enumerated(EnumType.STRING)` 조합을 권장합니다.
 - DB `FOREIGN KEY`를 쓰지 않으므로 Service 레이어에서 참조 무결성을 검증해야 합니다.
+- cursor 목록 조회 인덱스는 필터 컬럼 뒤에 정렬 컬럼과 `id`를 함께 고려합니다. 기본 정렬은 `created_at DESC, id DESC`입니다.
 - `chat_messages.metadata`는 AI 구조화 결과를 빠르게 저장하기 위한 JSON 필드입니다.
 - 의료 조언과 관련된 메시지는 UI와 응답 템플릿에 고지를 함께 두는 것을 권장합니다.
