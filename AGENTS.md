@@ -22,7 +22,6 @@
 - DB는 `FOREIGN KEY`, `CHECK`, MySQL `ENUM` 없이 설계한다.
 - DB 상태값은 `VARCHAR`로 저장하고 Java enum과 애플리케이션 검증으로 관리한다.
 - DB 참조 무결성, 권한, 상태 전이는 Service 레이어에서 검증한다.
-- Spring Security는 초기 구현에서 사용하지 않는다.
 - 카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현한다.
 - 백엔드 자체 access token은 JWT로 발급하고 `Authorization: Bearer {accessToken}` 헤더로 검증한다.
 - 가족 초대는 DB에 저장되는 6글자 초대 코드 방식으로 구현한다.
