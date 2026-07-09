@@ -43,6 +43,7 @@ API 경로는 `/api/v1` prefix를 사용합니다.
 | `404 Not Found` | 리소스 없음 |
 | `409 Conflict` | 중복, 상태 충돌 |
 | `422 Unprocessable Entity` | 비즈니스 규칙 위반 |
+| `502 Bad Gateway` | 외부 API 연동 실패 |
 | `500 Internal Server Error` | 서버 오류 |
 
 ## 4. URL 네이밍
@@ -59,13 +60,13 @@ DELETE /api/v1/emotion-records/{emotionRecordId}
 
 ```http
 GET  /api/v1/pregnancies/{pregnancyId}/emotion-records
-POST /api/v1/pregnancies/{pregnancyId}/invite-tokens
+POST /api/v1/pregnancies/{pregnancyId}/family-invite-codes
 ```
 
 행동성 API는 짧은 동사형 suffix를 허용합니다.
 
 ```http
-POST /api/v1/invite-tokens/{token}/accept
+POST /api/v1/family-invite-codes/accept
 POST /api/v1/calendar-events/{eventId}/confirm
 POST /api/v1/notifications/{notificationId}/read
 ```
@@ -109,16 +110,12 @@ public class ApiResponse<T> {
         return new ApiResponse<>(ResultType.SUCCESS, data, null, null);
     }
 
-    public static <S> ApiResponse<S> success(String message) {
-        return new ApiResponse<>(ResultType.SUCCESS, null, null, message);
-    }
-
-    public static <S> ApiResponse<S> success(S data, String message) {
-        return new ApiResponse<>(ResultType.SUCCESS, data, null, message);
-    }
-
     public static <S> ApiResponse<S> error(String code, String message) {
         return new ApiResponse<>(ResultType.ERROR, null, code, message);
+    }
+
+    public static <S> ApiResponse<S> error(String code, String message, S data) {
+        return new ApiResponse<>(ResultType.ERROR, data, code, message);
     }
 }
 ```
@@ -242,6 +239,41 @@ LIMIT :sizePlusOne
 5. 없으면 `users`, `oauth_accounts`를 생성한다.
 6. 백엔드는 자체 access token을 JWT로 발급한다.
 
+현재 카카오 로그인 API:
+
+```http
+POST /api/v1/auth/kakao-login
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "kakaoAccessToken": "kakao-access-token",
+  "role": "MOTHER"
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "userId": 1,
+    "nickname": "온맘",
+    "profileImageUrl": "https://example.com/profile.png",
+    "role": "MOTHER",
+    "tokenType": "Bearer",
+    "accessToken": "jwt-access-token",
+    "expiresIn": 7200
+  }
+}
+```
+
+`role`은 `MOTHER`, `FAMILY`만 허용합니다. 기존 카카오 계정이면 `oauth_accounts(provider, provider_user_id)`로 기존 사용자와 저장된 역할을 사용하고, 없으면 요청 `role`을 `users.primary_role`로 저장한 뒤 `users`, `oauth_accounts`를 생성합니다.
+
 JWT 기본 정책:
 
 ```text
@@ -254,13 +286,21 @@ expiresIn = 2 hours
 
 JWT 서명 키는 환경 변수 또는 외부 설정으로 주입하고, 코드나 저장소에 평문으로 커밋하지 않습니다. 초기 구현에서는 refresh token을 발급하지 않습니다. refresh token이 필요해지면 토큰 저장/폐기 정책과 DB 테이블을 별도 설계한 뒤 추가합니다.
 
+현재 설정 키:
+
+```text
+onmom.jwt.secret=${ONMOM_JWT_SECRET:}
+onmom.jwt.access-token-expiration=2h
+onmom.kakao.user-info-url=https://kapi.kakao.com/v2/user/me
+```
+
 로그인 이후 인증이 필요한 API는 아래 헤더를 사용합니다.
 
 ```http
 Authorization: Bearer {accessToken}
 ```
 
-Spring Security를 쓰지 않는 경우에도 `HandlerInterceptor` 또는 필터에서 JWT 서명, 만료 시간, 필수 claim을 검증하고 현재 사용자 ID를 요청 컨텍스트에 저장합니다. 권한 검증은 Service 레이어에서 이 사용자 ID를 기준으로 수행합니다.
+Spring Security를 쓰지 않는 경우에도 인증이 필요한 API는 Controller 진입 전에 JWT 서명, 만료 시간, 필수 claim을 검증하고 현재 사용자 ID를 요청 컨텍스트에 저장합니다. 권한 검증은 Service 레이어에서 이 사용자 ID를 기준으로 수행합니다.
 
 인증 실패 에러:
 
@@ -271,6 +311,15 @@ Spring Security를 쓰지 않는 경우에도 `HandlerInterceptor` 또는 필터
 | JWT 서명 invalid | 401 | `INVALID_TOKEN` |
 | JWT 만료 | 401 | `EXPIRED_TOKEN` |
 | JWT 필수 claim 누락 | 401 | `INVALID_TOKEN` |
+| 카카오 access token invalid | 401 | `KAKAO_TOKEN_INVALID` |
+| 카카오 사용자 정보 조회 실패 | 502 | `KAKAO_USER_INFO_FAILED` |
+| 지원하지 않는 role | 400 | `INVALID_ROLE` |
+| JWT 서명 키 미설정 | 500 | `JWT_SECRET_NOT_CONFIGURED` |
+| 초대 코드 없음 또는 사용 불가 | 400 | `INVALID_INVITE_CODE` |
+| 초대 코드 만료 | 400 | `EXPIRED_INVITE_CODE` |
+| 본인 초대 코드 수락 | 400 | `CANNOT_ACCEPT_OWN_INVITE` |
+| 임신 프로필 없음 | 404 | `PREGNANCY_NOT_FOUND` |
+| 임신 프로필 권한 없음 | 403 | `PREGNANCY_ACCESS_DENIED` |
 
 ## 8. 권한 규칙
 
@@ -282,7 +331,75 @@ FAMILY: family_connections.family_user_id == currentUserId
         AND family_connections.status == CONNECTED
 ```
 
-## 9. 도메인형 파일 구조
+## 9. 가족 초대 정책
+
+초기 MVP에서는 산모가 발급한 6글자 초대 코드를 가족이 입력해 연결합니다. 초대 코드는 DB에 저장하고, 실제 연결 결과는 `family_connections`에 저장합니다.
+
+초대 코드 정책:
+
+```text
+length = 6
+alphabet = ABCDEFGHJKLMNPQRSTUVWXYZ23456789
+expiresIn = 10 minutes
+activeCode = one PENDING code per pregnancy
+usage = multiple family users can accept the same code before expiration
+```
+
+새 코드를 발급하면 같은 pregnancy의 기존 `PENDING` 코드는 `REVOKED` 처리합니다. 만료 전 여러 가족이 같은 코드를 입력할 수 있으므로 코드 자체에는 `ACCEPTED` 상태를 사용하지 않습니다.
+
+초대 생성 예시:
+
+```http
+POST /api/v1/pregnancies/{pregnancyId}/family-invite-codes
+Authorization: Bearer {accessToken}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "code": "A7K2Q9",
+    "expiresAt": "2026-07-09T12:10:00.000"
+  }
+}
+```
+
+초대 수락 예시:
+
+```http
+POST /api/v1/family-invite-codes/accept
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "code": "A7K2Q9"
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "pregnancyId": 1,
+    "connectionId": 10,
+    "status": "CONNECTED"
+  }
+}
+```
+
+수락 시 서버는 코드 존재 여부, 상태, 만료 시간, 본인 초대 수락 여부, 가족 연결 중복 여부를 검증한 뒤 `family_connections`를 생성하거나 연결 상태를 갱신합니다.
+
+초대 코드 취소 API, 초대 코드 목록 조회 API, 초대 사용 이력 테이블은 MVP 범위에서 제외합니다.
+
+## 10. 도메인형 파일 구조
 
 기준 루트 패키지는 `com.onmom`입니다. 프로젝트 생성 초기 패키지가 이와 다르면, 도메인 구현을 늘리기 전에 이 기준으로 정리합니다.
 
@@ -325,7 +442,7 @@ client
 - Service는 Repository, domain, 외부 client에 의존한다.
 - Entity를 Controller 응답으로 직접 반환하지 않는다.
 
-## 10. DTO와 Validation
+## 11. DTO와 Validation
 
 - 요청 DTO 이름은 `{Action}{Domain}Request` 형식을 사용합니다.
 - 응답 DTO 이름은 `{Domain}Response` 또는 `{Action}{Domain}Response` 형식을 사용합니다.
@@ -333,13 +450,15 @@ client
 - 요청 DTO에는 Bean Validation을 사용합니다.
 - 비즈니스 검증은 Service에서 처리합니다.
 
-## 11. Controller 작성 규칙
+## 12. Controller 작성 규칙
 
 - Controller는 요청/응답 변환과 HTTP 상태 코드 지정에 집중한다.
 - 비즈니스 로직은 Service에 둔다.
 - Entity를 직접 반환하지 않는다.
 - `@RequestBody`에는 반드시 DTO를 사용한다.
 - `@Valid`로 기본 검증을 수행한다.
+- 의존성 주입은 생성자 주입을 기본으로 한다.
+- 특별한 이유 없이 필드 주입이나 `@Autowired`를 사용하지 않는다.
 
 예:
 
@@ -361,7 +480,7 @@ public class EmotionRecordController {
 }
 ```
 
-## 12. Service 작성 규칙
+## 13. Service 작성 규칙
 
 - 트랜잭션 경계는 Service에 둔다.
 - 읽기 전용 조회에는 `@Transactional(readOnly = true)`를 사용한다.
@@ -369,7 +488,16 @@ public class EmotionRecordController {
 - 권한 검증은 Service 진입 초기에 수행한다.
 - 목록 조회는 offset pagination 대신 cursor 조건을 사용한다.
 
-## 13. 협업 체크리스트
+## 14. 테스트 작성 규칙
+
+- 단위 테스트는 DB, Docker, 외부 API에 직접 의존하지 않는다.
+- Service 단위 테스트는 Repository, 외부 Client, JWT 발급기 등을 mock 또는 fake로 대체한다.
+- Controller 테스트는 요청/응답 형식, validation, status code를 중심으로 검증한다.
+- 초기 개발 단계에서는 모듈/단위 테스트를 우선 작성한다.
+- MySQL DDL, Flyway migration, JPA 매핑 검증은 DB 구조가 안정화된 뒤 별도 통합 테스트로 분리한다.
+- 통합 테스트는 단위 테스트보다 느리므로 필요한 범위를 명확히 한다.
+
+## 15. 협업 체크리스트
 
 API를 추가할 때 PR에 아래 내용을 포함합니다.
 

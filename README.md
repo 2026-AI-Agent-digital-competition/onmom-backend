@@ -12,7 +12,7 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - 산모/가족 역할 선택
 - 카카오 로그인
 - 산모 정보와 임신 주수 등록
-- QR/초대 링크 기반 가족 연결
+- 6글자 초대 코드 기반 가족 연결
 - 감정 기록과 AI 리포트
 - 온맘 AI 채팅
 - 병원 예약 일정 저장
@@ -31,11 +31,13 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - MySQL 8
 - Flyway
 - Validation
+- Jackson
 - Lombok
 - Docker Compose Support
-- Testcontainers
 
 카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현합니다. 로그인 성공 후 백엔드는 자체 access token을 JWT로 발급합니다.
+
+JWT 서명 키는 `ONMOM_JWT_SECRET` 환경 변수 또는 외부 설정으로 주입합니다. 저장소에는 운영용 secret을 커밋하지 않습니다.
 
 ## 문서
 
@@ -58,6 +60,79 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - DB는 `FOREIGN KEY`, `CHECK`, MySQL `ENUM` 없이 설계합니다.
 - DB 상태값은 `VARCHAR`로 저장하고 Java enum과 애플리케이션 검증으로 관리합니다.
 - 자체 access token은 JWT로 발급하고 `Authorization: Bearer {accessToken}` 헤더로 검증합니다.
+- 의존성 주입은 생성자 주입을 기본으로 합니다.
+
+## 현재 구현된 API
+
+### 카카오 로그인
+
+```http
+POST /api/v1/auth/kakao-login
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "kakaoAccessToken": "kakao-access-token",
+  "role": "MOTHER"
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "userId": 1,
+    "nickname": "온맘",
+    "profileImageUrl": "https://example.com/profile.png",
+    "role": "MOTHER",
+    "tokenType": "Bearer",
+    "accessToken": "jwt-access-token",
+    "expiresIn": 7200
+  }
+}
+```
+
+`role`은 `MOTHER`, `FAMILY`를 사용합니다. 기존 카카오 계정이면 저장된 사용자와 역할을 사용하고, 없으면 요청 `role`을 `users.primary_role`로 저장한 뒤 `users`, `oauth_accounts`를 생성합니다.
+
+### 가족 초대 코드 발급
+
+```http
+POST /api/v1/pregnancies/{pregnancyId}/family-invite-codes
+Authorization: Bearer {accessToken}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "code": "A7K2Q9",
+    "expiresAt": "2026-07-09T12:10:00.000"
+  }
+}
+```
+
+### 가족 초대 코드 수락
+
+```http
+POST /api/v1/family-invite-codes/accept
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "code": "A7K2Q9"
+}
+```
 
 ## 권장 패키지 구조
 
@@ -197,6 +272,12 @@ docs/onmom_api_guidelines.md와 docs/onmom_db_design.md를 읽고,
 - 권한 조건
 - 테스트 케이스
 - DB 변경 여부
+
+## 테스트 정책
+
+- 단위 테스트는 DB와 외부 API에 직접 의존하지 않도록 작성합니다.
+- 현재 단계에서는 모듈/단위 테스트를 우선 작성합니다.
+- MySQL DDL, Flyway, JPA 매핑 검증은 DB 구조가 안정화된 뒤 별도 통합 테스트로 분리합니다.
 
 ## 현재 산출물
 
