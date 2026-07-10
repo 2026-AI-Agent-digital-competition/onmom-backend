@@ -1,8 +1,5 @@
 package com.onmom.global.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onmom.global.exception.BusinessException;
 import com.onmom.global.exception.ErrorCode;
 import com.onmom.user.domain.UserRole;
@@ -16,6 +13,9 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class JwtTokenProvider {
@@ -96,7 +96,7 @@ public class JwtTokenProvider {
     private String base64UrlJson(Map<String, Object> value) {
         try {
             return base64UrlEncode(objectMapper.writeValueAsBytes(value));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Failed to serialize JWT JSON.", exception);
         }
     }

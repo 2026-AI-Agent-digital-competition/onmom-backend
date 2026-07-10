@@ -3,8 +3,6 @@ package com.onmom.global.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onmom.global.exception.BusinessException;
 import com.onmom.global.exception.ErrorCode;
 import com.onmom.user.domain.UserRole;
@@ -17,6 +15,8 @@ import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 class JwtTokenProviderTest {
 

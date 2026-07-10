@@ -3,6 +3,7 @@ package com.onmom.global.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class ApiResponseTest {
 
@@ -24,5 +25,18 @@ class ApiResponseTest {
         assertThat(response.getData()).isNull();
         assertThat(response.getCode()).isEqualTo("INVALID_ROLE");
         assertThat(response.getMessage()).isEqualTo("지원하지 않는 사용자 역할입니다.");
+    }
+
+    @Test
+    void jacksonThreeOmitsNullFields() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        String json = objectMapper.writeValueAsString(ApiResponse.success(1L));
+
+        assertThat(json)
+                .contains("\"result\":\"SUCCESS\"")
+                .contains("\"data\":1")
+                .doesNotContain("\"code\"")
+                .doesNotContain("\"message\"");
     }
 }
