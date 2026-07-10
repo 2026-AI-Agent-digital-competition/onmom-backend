@@ -283,7 +283,7 @@ Content-Type: application/json
 
 카카오 원격 호출은 DB 트랜잭션 밖에서 실행합니다. OAuth 계정 조회·생성은 별도 트랜잭션에서 처리하고 `oauth_accounts(provider, provider_user_id)` UNIQUE 충돌을 `saveAndFlush`로 확인합니다. 동시 요청 중 실패한 트랜잭션이 종료되면 먼저 생성된 기존 계정을 새 read-only 트랜잭션에서 재조회합니다.
 
-카카오 token/user-info 외부 연동 장애는 `WARN`으로 기록하되 `stage`, HTTP status, 예외 종류만 포함합니다. 인가 코드 4xx는 로그를 남기지 않으며 인가 코드, access/refresh token, client secret, 이메일, 카카오 회원번호, 응답 본문을 모든 로그에서 제외합니다.
+카카오 token/user-info 외부 연동 장애는 `WARN`으로 기록하되 `stage`, HTTP status, 예외 종류만 포함합니다. token endpoint의 `400 Bad Request`는 만료·재사용·invalid 인가 코드로 처리하고 로그를 남기지 않습니다. token endpoint의 `401/403`은 OAuth client 설정 거절로, `429`와 그 밖의 4xx/5xx는 외부 연동 실패로 기록합니다. 인가 코드, access/refresh token, client secret, 이메일, 카카오 회원번호, 응답 본문은 모든 로그에서 제외합니다.
 
 JWT 기본 정책:
 
@@ -328,8 +328,9 @@ Spring Security를 쓰지 않는 경우에도 인증이 필요한 API는 Control
 | JWT 만료 | 401 | `EXPIRED_TOKEN` |
 | JWT 필수 claim 누락 | 401 | `INVALID_TOKEN` |
 | 카카오 인가 코드 만료, 재사용 또는 invalid | 401 | `KAKAO_AUTHORIZATION_CODE_INVALID` |
-| 카카오 token/user-info 외부 연동 실패 | 502 | `KAKAO_LOGIN_FAILED` |
 | 카카오 OAuth 설정 누락 | 500 | `KAKAO_OAUTH_NOT_CONFIGURED` |
+| 카카오 OAuth client 인증 거절 | 500 | `KAKAO_OAUTH_CONFIGURATION_INVALID` |
+| 카카오 rate limit, 기타 token/user-info 외부 연동 실패 | 502 | `KAKAO_LOGIN_FAILED` |
 | 지원하지 않는 role | 400 | `INVALID_ROLE` |
 | JWT 서명 키 미설정 | 500 | `JWT_SECRET_NOT_CONFIGURED` |
 | 초대 코드 없음 또는 사용 불가 | 400 | `INVALID_INVITE_CODE` |
