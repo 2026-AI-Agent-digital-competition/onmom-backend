@@ -17,6 +17,11 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     ROLE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 사용자 역할로 수행할 수 없는 요청입니다."),
     ACTIVE_PREGNANCY_ALREADY_EXISTS(HttpStatus.CONFLICT, "활성 임신 프로필이 이미 존재합니다."),
+    PREGNANCY_NOT_FOUND(HttpStatus.NOT_FOUND, "임신 프로필을 찾을 수 없습니다."),
+    PREGNANCY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "임신 프로필에 접근할 권한이 없습니다."),
+    INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "초대 코드가 올바르지 않습니다."),
+    EXPIRED_INVITE_CODE(HttpStatus.BAD_REQUEST, "초대 코드가 만료되었습니다."),
+    CANNOT_ACCEPT_OWN_INVITE(HttpStatus.BAD_REQUEST, "본인이 발급한 초대 코드는 수락할 수 없습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
 
     private final HttpStatus status;
