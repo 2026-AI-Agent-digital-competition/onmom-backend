@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -57,7 +58,7 @@ public class KakaoClient {
                     .body(formData)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (request, clientResponse) -> {
-                        throw new BusinessException(ErrorCode.KAKAO_AUTHORIZATION_CODE_INVALID);
+                        handleTokenClientError(clientResponse.getStatusCode());
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (request, clientResponse) -> {
                         logHttpFailure(TOKEN_EXCHANGE_STAGE, clientResponse.getStatusCode());
@@ -109,6 +110,19 @@ public class KakaoClient {
 
     private void logHttpFailure(String stage, HttpStatusCode statusCode) {
         log.warn("Kakao external call failed: stage={} status={}", stage, statusCode.value());
+    }
+
+    private void handleTokenClientError(HttpStatusCode statusCode) {
+        if (statusCode.value() == HttpStatus.BAD_REQUEST.value()) {
+            throw new BusinessException(ErrorCode.KAKAO_AUTHORIZATION_CODE_INVALID);
+        }
+
+        logHttpFailure(TOKEN_EXCHANGE_STAGE, statusCode);
+        if (statusCode.value() == HttpStatus.UNAUTHORIZED.value()
+                || statusCode.value() == HttpStatus.FORBIDDEN.value()) {
+            throw new BusinessException(ErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
+        }
+        throw new BusinessException(ErrorCode.KAKAO_LOGIN_FAILED);
     }
 
     private void logClientFailure(String stage, RestClientException exception) {

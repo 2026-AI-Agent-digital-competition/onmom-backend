@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import ch.qos.logback.classic.Level;
@@ -22,8 +23,11 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -115,6 +119,38 @@ class KakaoClientTest {
                 ErrorCode.KAKAO_AUTHORIZATION_CODE_INVALID
         );
         assertThat(warningMessages()).isEmpty();
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = HttpStatus.class, names = {"UNAUTHORIZED", "FORBIDDEN"})
+    void mapsRejectedClientCredentialsToOauthConfigurationError(HttpStatus status) {
+        server.expect(requestTo(TOKEN_URL)).andRespond(withStatus(status));
+
+        assertErrorCode(
+                () -> client.authenticate("authorization-code"),
+                ErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID
+        );
+        assertThat(warningMessages()).containsExactly(
+                "Kakao external call failed: stage=token_exchange status=" + status.value()
+        );
+        assertNoSensitiveInformationInLogs();
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = HttpStatus.class, names = {"TOO_MANY_REQUESTS", "NOT_FOUND"})
+    void mapsOtherTokenClientErrorsToKakaoLoginFailure(HttpStatus status) {
+        server.expect(requestTo(TOKEN_URL)).andRespond(withStatus(status));
+
+        assertErrorCode(
+                () -> client.authenticate("authorization-code"),
+                ErrorCode.KAKAO_LOGIN_FAILED
+        );
+        assertThat(warningMessages()).containsExactly(
+                "Kakao external call failed: stage=token_exchange status=" + status.value()
+        );
+        assertNoSensitiveInformationInLogs();
         server.verify();
     }
 
