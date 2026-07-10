@@ -9,6 +9,9 @@ public enum ErrorCode {
     INVALID_AUTHORIZATION_HEADER(HttpStatus.UNAUTHORIZED, "Authorization 헤더 형식이 올바르지 않습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "토큰이 올바르지 않습니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "토큰이 만료되었습니다."),
+    KAKAO_AUTHORIZATION_CODE_INVALID(HttpStatus.UNAUTHORIZED, "카카오 인가 코드가 올바르지 않습니다."),
+    KAKAO_LOGIN_FAILED(HttpStatus.BAD_GATEWAY, "카카오 로그인 처리에 실패했습니다."),
+    KAKAO_OAUTH_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "카카오 OAuth 설정이 구성되지 않았습니다."),
     JWT_SECRET_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "JWT 서명 키가 설정되지 않았습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
 
