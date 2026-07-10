@@ -22,11 +22,16 @@
 - DB는 `FOREIGN KEY`, `CHECK`, MySQL `ENUM` 없이 설계한다.
 - DB 상태값은 `VARCHAR`로 저장하고 Java enum과 애플리케이션 검증으로 관리한다.
 - DB 참조 무결성, 권한, 상태 전이는 Service 레이어에서 검증한다.
-- 카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현한다.
+- React 웹은 카카오 인가 요청의 `state`를 검증한 뒤 인가 코드를 백엔드에 전달한다.
+- 백엔드는 인가 코드를 카카오 access token으로 교환하고 사용자 정보 API를 호출해 카카오 회원번호를 확인한다.
+- 카카오 client ID(REST API 키), client secret, redirect URI는 환경 변수 또는 외부 설정으로 주입하고, 카카오 access/refresh token은 클라이언트에 반환하거나 DB에 저장하지 않는다.
+- 카카오 authorization URI는 React SDK가 관리하고, token/user-info endpoint는 `KakaoClient` 내부 상수로 관리한다.
+- 카카오 외부 연동 장애 로그에는 실패 단계, HTTP 상태, 예외 종류만 남기고 인가 코드, 토큰, secret, 사용자 정보, 응답 본문을 기록하지 않는다.
 - 백엔드 자체 access token은 JWT로 발급하고 `Authorization: Bearer {accessToken}` 헤더로 검증한다.
+- CORS 허용 origin은 환경 변수로 주입하고 `/api/**`에만 적용하며, JWT 헤더 방식에서는 credentials를 허용하지 않는다.
 - 가족 초대는 DB에 저장되는 6글자 초대 코드 방식으로 구현한다.
 - 초대 코드는 pregnancy당 활성 코드 1개만 유지하고, 만료 전 여러 가족이 사용할 수 있다.
-- JWT 서명 키는 `ONMOM_JWT_SECRET` 등 환경 변수 또는 외부 설정으로 주입하고 저장소에 커밋하지 않는다.
+- JWT 서명 키와 카카오 client secret은 환경 변수 또는 외부 설정으로 주입하고 저장소에 커밋하지 않는다.
 - 의존성 주입은 생성자 주입을 기본으로 하며, 특별한 이유 없이 필드 주입이나 `@Autowired`를 사용하지 않는다.
 
 ## 패키지 구조 기준
