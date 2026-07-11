@@ -7,6 +7,9 @@ public enum ErrorCode {
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "요청 본문이 올바르지 않습니다."),
     INVALID_CURSOR(HttpStatus.BAD_REQUEST, "커서 형식이 올바르지 않습니다."),
     INVALID_ROLE(HttpStatus.BAD_REQUEST, "지원하지 않는 사용자 역할입니다."),
+    INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "초대 코드가 올바르지 않습니다."),
+    EXPIRED_INVITE_CODE(HttpStatus.BAD_REQUEST, "초대 코드가 만료되었습니다."),
+    CANNOT_ACCEPT_OWN_INVITE(HttpStatus.BAD_REQUEST, "본인이 발급한 초대 코드는 수락할 수 없습니다."),
 
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     INVALID_AUTHORIZATION_HEADER(HttpStatus.UNAUTHORIZED, "Authorization 헤더 형식이 올바르지 않습니다."),
@@ -14,6 +17,7 @@ public enum ErrorCode {
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "토큰이 만료되었습니다."),
     KAKAO_AUTHORIZATION_CODE_INVALID(HttpStatus.UNAUTHORIZED, "카카오 인가 코드가 올바르지 않습니다."),
 
+    ROLE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 사용자 역할로 수행할 수 없는 요청입니다."),
     PREGNANCY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "임신 프로필에 접근할 권한이 없습니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
@@ -22,6 +26,8 @@ public enum ErrorCode {
     EMOTION_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "감정 기록을 찾을 수 없습니다."),
     AI_REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 리포트를 찾을 수 없습니다."),
     CONNECTED_FAMILY_NOT_FOUND(HttpStatus.NOT_FOUND, "연결된 가족을 찾을 수 없습니다."),
+
+    ACTIVE_PREGNANCY_ALREADY_EXISTS(HttpStatus.CONFLICT, "활성 임신 프로필이 이미 존재합니다."),
 
     KAKAO_LOGIN_FAILED(HttpStatus.BAD_GATEWAY, "카카오 로그인 처리에 실패했습니다."),
     AI_MESSAGE_FAILED(HttpStatus.BAD_GATEWAY, "AI 응답 생성에 실패했습니다."),

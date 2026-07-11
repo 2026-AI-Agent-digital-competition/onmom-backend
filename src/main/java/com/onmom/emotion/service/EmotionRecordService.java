@@ -13,6 +13,7 @@ import com.onmom.emotion.repository.EmotionRecordRepository;
 import com.onmom.global.exception.BusinessException;
 import com.onmom.global.exception.ErrorCode;
 import com.onmom.pregnancy.domain.Pregnancy;
+import com.onmom.pregnancy.domain.PregnancyStatus;
 import com.onmom.pregnancy.repository.PregnancyRepository;
 import com.onmom.user.domain.User;
 import com.onmom.user.domain.UserStatus;
@@ -139,7 +140,7 @@ public class EmotionRecordService {
         Pregnancy pregnancy = pregnancyRepository.findById(pregnancyId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PREGNANCY_NOT_FOUND));
 
-        if (!"ACTIVE".equals(pregnancy.getStatus())) {
+        if (pregnancy.getStatus() != PregnancyStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.PREGNANCY_NOT_FOUND);
         }
         if (!pregnancy.getMotherUserId().equals(currentUserId)) {

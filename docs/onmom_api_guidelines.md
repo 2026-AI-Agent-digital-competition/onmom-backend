@@ -318,6 +318,47 @@ Authorization: Bearer {accessToken}
 
 Spring Security를 쓰지 않는 경우에도 인증이 필요한 API는 Controller 진입 전에 JWT 서명, 만료 시간, 필수 claim을 검증하고 현재 사용자 ID를 요청 컨텍스트에 저장합니다. 권한 검증은 Service 레이어에서 이 사용자 ID를 기준으로 수행합니다.
 
+### 역할별 초기 등록
+
+로그인에서 선택한 `users.primary_role`을 기준으로 초기 등록 API를 분리합니다. 별도 onboarding 상태 컬럼을 두지 않고 `MOTHER`는 활성 임신 프로필, `FAMILY`는 `CONNECTED` 가족 연결의 존재로 완료 여부를 판단합니다.
+
+산모 임신 프로필 생성:
+
+```http
+POST /api/v1/pregnancies
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "motherDisplayName": "온맘",
+  "babyNickname": "튼튼이",
+  "pregnancyWeekStart": 12,
+  "pregnancyWeekEnd": 13,
+  "dueDate": "2027-01-01"
+}
+```
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "id": 1,
+    "motherDisplayName": "온맘",
+    "babyNickname": "튼튼이",
+    "pregnancyWeekStart": 12,
+    "pregnancyWeekEnd": 13,
+    "dueDate": "2027-01-01",
+    "status": "ACTIVE"
+  }
+}
+```
+
+`motherDisplayName`은 필수이며 나머지는 선택입니다. 임신 주차는 둘 다 생략하거나 함께 입력하고 각각 0~42 범위와 `pregnancyWeekStart <= pregnancyWeekEnd`를 검증합니다. 활성 `MOTHER`만 생성할 수 있고 산모당 `ACTIVE` 임신 프로필은 하나만 허용합니다. 성공 시 `201 Created`로 임신 프로필 DTO를 반환하며 가족 초대 코드는 자동 발급하지 않습니다.
+
+`FAMILY`는 아래 가족 초대 코드 수락 API를 초기 등록 과정에서 호출합니다. 활성 `FAMILY`만 수락할 수 있으며 연결 상태가 `CONNECTED`가 되면 초기 등록이 완료된 것으로 판단합니다.
+
 인증 실패 에러:
 
 | 상황 | Status | Error code |
@@ -333,6 +374,8 @@ Spring Security를 쓰지 않는 경우에도 인증이 필요한 API는 Control
 | 카카오 rate limit, 기타 token/user-info 외부 연동 실패 | 502 | `KAKAO_LOGIN_FAILED` |
 | 지원하지 않는 role | 400 | `INVALID_ROLE` |
 | JWT 서명 키 미설정 | 500 | `JWT_SECRET_NOT_CONFIGURED` |
+| 현재 역할로 수행할 수 없는 API | 403 | `ROLE_ACCESS_DENIED` |
+| 활성 임신 프로필 중복 생성 | 409 | `ACTIVE_PREGNANCY_ALREADY_EXISTS` |
 | 초대 코드 없음 또는 사용 불가 | 400 | `INVALID_INVITE_CODE` |
 | 초대 코드 만료 | 400 | `EXPIRED_INVITE_CODE` |
 | 본인 초대 코드 수락 | 400 | `CANNOT_ACCEPT_OWN_INVITE` |
@@ -364,6 +407,8 @@ usage = multiple family users can accept the same code before expiration
 ```
 
 새 코드를 발급하면 같은 pregnancy의 기존 `PENDING` 코드는 `REVOKED` 처리합니다. 만료 전 여러 가족이 같은 코드를 입력할 수 있으므로 코드 자체에는 `ACCEPTED` 상태를 사용하지 않습니다.
+
+동시 발급은 pregnancy 행을 잠가 직렬화하고 마지막 요청의 코드만 `PENDING`으로 유지합니다. 전역 코드 UNIQUE 충돌은 실패한 트랜잭션이 종료된 뒤 새 코드로 재시도합니다. 만료 코드는 상태 변경 트랜잭션을 정상 완료한 뒤 `EXPIRED_INVITE_CODE`를 반환해 `EXPIRED` 상태가 DB에 남도록 합니다. 동일 가족의 동시 수락으로 연결 UNIQUE 충돌이 발생하면 먼저 생성된 `CONNECTED` 관계를 새 트랜잭션에서 재조회합니다.
 
 초대 생성 예시:
 

@@ -59,6 +59,8 @@ erDiagram
 
 ## 권한 정책
 
+초기 등록 완료 여부는 별도 컬럼으로 저장하지 않습니다. `MOTHER`는 본인의 `ACTIVE` 임신 프로필이 있으면 완료, `FAMILY`는 `CONNECTED` 가족 연결이 있으면 완료로 판단합니다.
+
 ### 산모
 
 - 본인의 임신 프로필 생성/수정
@@ -111,6 +113,9 @@ erDiagram
 - `family_invite_codes.status`는 현재 `PENDING`, `REVOKED`, `EXPIRED` 문자열 enum 값으로 관리합니다.
 - 초대 코드는 pregnancy당 활성 `PENDING` 코드 1개만 유지하고, 만료 전 여러 가족이 사용할 수 있습니다.
 - 실제 가족 연결 결과와 중복 방지는 `family_connections(pregnancy_id, family_user_id)` 기준으로 관리합니다.
+- 산모당 `ACTIVE` 임신 프로필은 1개만 허용하며 사용자 행 잠금과 Service 검증으로 동시 생성을 직렬화합니다.
+- 초대 발급은 pregnancy 행을 잠가 pregnancy당 `PENDING` 코드 1개를 유지하고, 코드 UNIQUE 충돌은 새 트랜잭션에서 재시도합니다.
+- 만료 요청은 상태 변경 트랜잭션을 커밋한 뒤 오류를 반환하며, 동일 가족의 연결 UNIQUE 충돌은 먼저 생성된 연결을 재조회합니다.
 - DB `FOREIGN KEY`를 쓰지 않으므로 Service 레이어에서 참조 무결성을 검증해야 합니다.
 - cursor 목록 조회 인덱스는 조회 조건 컬럼 뒤에 정렬 컬럼과 `id`를 함께 고려합니다. 기본 정렬은 `created_at DESC, id DESC`입니다.
 - `chat_messages.metadata`는 AI 구조화 결과를 빠르게 저장하기 위한 JSON 필드입니다.

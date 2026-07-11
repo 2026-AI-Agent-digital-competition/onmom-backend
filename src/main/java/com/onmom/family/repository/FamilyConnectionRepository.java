@@ -1,15 +1,24 @@
 package com.onmom.family.repository;
 
 import com.onmom.family.domain.FamilyConnection;
+import com.onmom.family.domain.FamilyConnectionStatus;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
-
 public interface FamilyConnectionRepository extends JpaRepository<FamilyConnection, Long> {
+
+    Optional<FamilyConnection> findByPregnancyIdAndFamilyUserId(Long pregnancyId, Long familyUserId);
+
+    boolean existsByPregnancyIdAndFamilyUserIdAndStatus(
+            Long pregnancyId,
+            Long familyUserId,
+            FamilyConnectionStatus status
+    );
 
     List<FamilyConnection> findByPregnancyIdAndMotherUserIdAndStatus(
             Long pregnancyId,
             Long motherUserId,
-            String status
+            FamilyConnectionStatus status
     );
 }

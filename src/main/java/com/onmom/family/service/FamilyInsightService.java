@@ -4,6 +4,7 @@ import com.onmom.ai.service.GeminiService;
 import com.onmom.emotion.domain.EmotionTranslation;
 import com.onmom.emotion.repository.EmotionTranslationRepository;
 import com.onmom.family.domain.FamilyConnection;
+import com.onmom.family.domain.FamilyConnectionStatus;
 import com.onmom.family.domain.FamilyMessage;
 import com.onmom.family.dto.CreateFamilyInsightRequest;
 import com.onmom.family.dto.FamilyInsightResponse;
@@ -14,6 +15,7 @@ import com.onmom.global.exception.ErrorCode;
 import com.onmom.notification.domain.Notification;
 import com.onmom.notification.repository.NotificationRepository;
 import com.onmom.pregnancy.domain.Pregnancy;
+import com.onmom.pregnancy.domain.PregnancyStatus;
 import com.onmom.pregnancy.repository.PregnancyRepository;
 import com.onmom.user.domain.User;
 import com.onmom.user.domain.UserStatus;
@@ -120,7 +122,7 @@ public class FamilyInsightService {
         Pregnancy pregnancy = pregnancyRepository.findById(pregnancyId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PREGNANCY_NOT_FOUND));
 
-        if (!"ACTIVE".equals(pregnancy.getStatus())) {
+        if (pregnancy.getStatus() != PregnancyStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.PREGNANCY_NOT_FOUND);
         }
         if (!pregnancy.getMotherUserId().equals(currentUserId)) {
@@ -131,7 +133,11 @@ public class FamilyInsightService {
 
     private List<FamilyConnection> findRecipients(Pregnancy pregnancy, Long recipientUserId) {
         List<FamilyConnection> connections = familyConnectionRepository
-                .findByPregnancyIdAndMotherUserIdAndStatus(pregnancy.getId(), pregnancy.getMotherUserId(), "CONNECTED");
+                .findByPregnancyIdAndMotherUserIdAndStatus(
+                        pregnancy.getId(),
+                        pregnancy.getMotherUserId(),
+                        FamilyConnectionStatus.CONNECTED
+                );
 
         if (recipientUserId != null) {
             connections = connections.stream()
