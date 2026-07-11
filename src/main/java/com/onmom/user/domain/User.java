@@ -73,4 +73,12 @@ public class User {
     public UserRole getPrimaryRole() {
         return primaryRole;
     }
+
+    public boolean isActive() {
+        return status == UserStatus.ACTIVE;
+    }
+
+    public boolean hasRole(UserRole role) {
+        return primaryRole == role;
+    }
 }

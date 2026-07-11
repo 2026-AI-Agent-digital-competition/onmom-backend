@@ -115,6 +115,47 @@ Content-Type: application/json
 
 `role`은 `MOTHER`, `FAMILY`를 사용합니다. 기존 카카오 계정이면 저장된 사용자와 역할을 사용하고, 없으면 요청 `role`을 `users.primary_role`로 저장한 뒤 `users`, `oauth_accounts`를 생성합니다. 동일 카카오 계정의 동시 로그인에서 OAuth UNIQUE 충돌이 발생하면 실패한 생성 트랜잭션을 종료한 후 먼저 생성된 계정을 재조회합니다.
 
+초기 등록은 역할별 도메인 데이터로 판단합니다. `MOTHER`는 활성 임신 프로필을 생성하면 완료되며 초대 코드 발급은 선택입니다. `FAMILY`는 초기 등록 과정에서 산모의 초대 코드를 수락해 `CONNECTED` 관계가 생성되어야 완료됩니다.
+
+### 임신 프로필 생성
+
+```http
+POST /api/v1/pregnancies
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "motherDisplayName": "온맘",
+  "babyNickname": "튼튼이",
+  "pregnancyWeekStart": 12,
+  "pregnancyWeekEnd": 13,
+  "dueDate": "2027-01-01"
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "id": 1,
+    "motherDisplayName": "온맘",
+    "babyNickname": "튼튼이",
+    "pregnancyWeekStart": 12,
+    "pregnancyWeekEnd": 13,
+    "dueDate": "2027-01-01",
+    "status": "ACTIVE"
+  }
+}
+```
+
+산모당 `ACTIVE` 임신 프로필은 하나만 허용합니다. 임신 주차는 둘 다 생략하거나 0~42 범위에서 함께 입력하며 시작 주차가 끝 주차보다 클 수 없습니다.
+
 ### 가족 초대 코드 발급
 
 ```http
@@ -147,6 +188,19 @@ Content-Type: application/json
 ```json
 {
   "code": "A7K2Q9"
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "pregnancyId": 1,
+    "connectionId": 10,
+    "status": "CONNECTED"
+  }
 }
 ```
 
