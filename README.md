@@ -35,9 +35,21 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - Lombok
 - Docker Compose Support
 
-카카오 로그인은 백엔드에서 카카오 사용자 정보 API를 직접 호출하는 방식으로 구현합니다. 로그인 성공 후 백엔드는 자체 access token을 JWT로 발급합니다.
+카카오 로그인은 React가 callback에서 받은 인가 코드를 백엔드에 전달하고, 백엔드가 카카오 access token 발급과 사용자 정보 조회를 수행하는 Authorization Code 방식으로 구현합니다. 로그인 성공 후 백엔드는 자체 access token을 JWT로 발급합니다.
 
-JWT 서명 키는 `ONMOM_JWT_SECRET` 환경 변수 또는 외부 설정으로 주입합니다. 저장소에는 운영용 secret을 커밋하지 않습니다.
+JWT 서명 키와 카카오 OAuth 설정은 환경 변수 또는 외부 설정으로 주입합니다. 저장소에는 운영용 secret을 커밋하지 않습니다.
+
+```text
+ONMOM_JWT_SECRET
+ONMOM_CORS_ALLOWED_ORIGINS
+ONMOM_KAKAO_CLIENT_ID
+ONMOM_KAKAO_CLIENT_SECRET
+ONMOM_KAKAO_REDIRECT_URI
+```
+
+`ONMOM_KAKAO_CLIENT_ID`에는 카카오 REST API 키를 설정합니다. React의 callback URI, 카카오 개발자 콘솔에 등록한 redirect URI, `ONMOM_KAKAO_REDIRECT_URI`는 동일해야 합니다. React는 인가 요청 전에 생성한 `state`를 callback에서 검증한 뒤 인가 코드를 백엔드로 전달합니다.
+
+React와 백엔드가 다른 origin이면 `ONMOM_CORS_ALLOWED_ORIGINS`에 허용할 React origin을 쉼표로 구분해 설정합니다. 기본 개발 origin은 `http://localhost:5173`이며 CORS는 `/api/**`에만 적용됩니다.
 
 ## 문서
 
@@ -75,7 +87,7 @@ Content-Type: application/json
 
 ```json
 {
-  "kakaoAccessToken": "kakao-access-token",
+  "authorizationCode": "single-use-kakao-code",
   "role": "MOTHER"
 }
 ```
@@ -92,12 +104,16 @@ Content-Type: application/json
     "role": "MOTHER",
     "tokenType": "Bearer",
     "accessToken": "jwt-access-token",
-    "expiresIn": 7200
+    "expiresIn": 3600
   }
 }
 ```
 
-`role`은 `MOTHER`, `FAMILY`를 사용합니다. 기존 카카오 계정이면 저장된 사용자와 역할을 사용하고, 없으면 요청 `role`을 `users.primary_role`로 저장한 뒤 `users`, `oauth_accounts`를 생성합니다.
+백엔드는 인가 코드를 카카오 access token으로 교환한 뒤 `/v2/user/me`를 호출합니다. 응답의 카카오 회원번호 `id`를 사용자 식별자로 사용하며 카카오 access/refresh token은 저장하거나 프론트에 반환하지 않습니다. token/user-info endpoint는 설정으로 노출하지 않고 `KakaoClient` 내부 상수로 관리합니다.
+
+카카오 외부 연동 장애는 실패 단계와 HTTP 상태 또는 예외 종류만 warning 로그로 기록합니다. 인가 코드, 카카오 토큰, client secret, 사용자 정보와 외부 응답 본문은 로그에 남기지 않습니다.
+
+`role`은 `MOTHER`, `FAMILY`를 사용합니다. 기존 카카오 계정이면 저장된 사용자와 역할을 사용하고, 없으면 요청 `role`을 `users.primary_role`로 저장한 뒤 `users`, `oauth_accounts`를 생성합니다. 동일 카카오 계정의 동시 로그인에서 OAuth UNIQUE 충돌이 발생하면 실패한 생성 트랜잭션을 종료한 후 먼저 생성된 계정을 재조회합니다.
 
 ### 가족 초대 코드 발급
 

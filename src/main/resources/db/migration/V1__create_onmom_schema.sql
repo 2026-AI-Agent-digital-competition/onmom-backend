@@ -56,20 +56,18 @@ CREATE TABLE family_connections (
   KEY idx_family_user_status (family_user_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE invite_tokens (
+CREATE TABLE family_invite_codes (
   id BIGINT NOT NULL AUTO_INCREMENT,
   pregnancy_id BIGINT NOT NULL,
   inviter_user_id BIGINT NOT NULL,
-  token VARCHAR(80) NOT NULL,
-  channel VARCHAR(20) NOT NULL,
+  code VARCHAR(6) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-  expires_at DATETIME(3) NULL,
-  accepted_by_user_id BIGINT NULL,
-  accepted_at DATETIME(3) NULL,
+  expires_at DATETIME(3) NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  UNIQUE KEY uk_invite_token (token),
-  KEY idx_invite_preg_status (pregnancy_id, status)
+  UNIQUE KEY uk_family_invite_code (code),
+  KEY idx_family_invite_preg_status (pregnancy_id, status),
+  KEY idx_family_invite_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE hospitals (

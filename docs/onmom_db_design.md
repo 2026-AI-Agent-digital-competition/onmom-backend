@@ -102,6 +102,9 @@ erDiagram
 - JPA에서는 DB 컬럼을 `VARCHAR`로 두고 Java `enum`과 `@Enumerated(EnumType.STRING)` 조합을 권장합니다.
 - 카카오 로그인은 `oauth_accounts.provider = 'KAKAO'`, `oauth_accounts.provider_user_id = kakao.id` 조합으로 내부 사용자를 찾습니다.
 - 신규 카카오 계정 로그인 시 `users`를 먼저 생성하고, 같은 트랜잭션 안에서 `oauth_accounts`를 생성합니다.
+- 카카오 토큰 발급과 사용자 정보 조회는 DB 트랜잭션 밖에서 실행하고, 사용자 정보 응답의 회원번호 `id`를 `provider_user_id`로 사용합니다.
+- OAuth 계정 조회·생성만 별도 트랜잭션에서 처리하며, 카카오 access/refresh token은 DB에 저장하지 않습니다.
+- 동일 카카오 계정의 동시 생성은 `oauth_accounts(provider, provider_user_id)` UNIQUE를 최종 방어선으로 사용합니다. 충돌한 트랜잭션을 종료한 뒤 먼저 생성된 계정을 새 read-only 트랜잭션에서 재조회합니다.
 - `users.primary_role`은 현재 `MOTHER`, `FAMILY` 문자열 enum 값으로 관리합니다.
 - `users.status`는 현재 `ACTIVE`, `DELETED` 문자열 enum 값으로 관리합니다.
 - 가족 초대는 `family_invite_codes.code`에 저장된 6글자 코드로 처리합니다.
