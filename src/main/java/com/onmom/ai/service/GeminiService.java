@@ -90,6 +90,7 @@ public class GeminiService {
 
         Map<String, Object> body = Map.of(
                 "model", model,
+                "store", false,
                 "system_instruction", """
                         너는 산모와 가족을 돕는 정서 지원 앱 '온맘'의 AI 도우미야.
 

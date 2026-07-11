@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(Exception exception) {
-        ErrorCode errorCode = ErrorCode.INVALID_REQUEST_BODY;
+        ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .contentType(APPLICATION_JSON_UTF8)

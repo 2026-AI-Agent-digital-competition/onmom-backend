@@ -25,10 +25,12 @@ import com.onmom.user.domain.UserStatus;
 import com.onmom.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class ChatService {
@@ -46,6 +48,7 @@ public class ChatService {
     private final GeminiService geminiService;
     private final SafetySignalDetector safetySignalDetector;
     private final ChatMessageCursorCodec cursorCodec;
+    private final TransactionTemplate transactionTemplate;
 
     public ChatService(
             ChatSessionRepository chatSessionRepository,
@@ -57,7 +60,8 @@ public class ChatService {
             AiReportRepository aiReportRepository,
             GeminiService geminiService,
             SafetySignalDetector safetySignalDetector,
-            ChatMessageCursorCodec cursorCodec
+            ChatMessageCursorCodec cursorCodec,
+            TransactionTemplate transactionTemplate
     ) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
@@ -69,10 +73,32 @@ public class ChatService {
         this.geminiService = geminiService;
         this.safetySignalDetector = safetySignalDetector;
         this.cursorCodec = cursorCodec;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
     public ChatMessageResponse createMessage(Long currentUserId, CreateChatMessageRequest request) {
+        ChatMessagePreparation preparation = Objects.requireNonNull(transactionTemplate.execute(status ->
+                prepareUserMessage(currentUserId, request)
+        ));
+
+        String answer = geminiService.askWithContext(request.message(), preparation.conversationContext());
+
+        ChatAiPersistence aiPersistence = Objects.requireNonNull(transactionTemplate.execute(status ->
+                saveAiResponse(preparation, answer)
+        ));
+
+        return new ChatMessageResponse(
+                preparation.sessionId(),
+                preparation.userMessageId(),
+                aiPersistence.aiMessageId(),
+                answer,
+                preparation.riskLevel(),
+                preparation.safetyAlertIds(),
+                aiPersistence.aiReportId()
+        );
+    }
+
+    private ChatMessagePreparation prepareUserMessage(Long currentUserId, CreateChatMessageRequest request) {
         validateUser(currentUserId);
         Pregnancy pregnancy = validatePregnancyAccess(request.pregnancyId(), currentUserId);
         ChatSession session = resolveSession(request, pregnancy, currentUserId);
@@ -88,32 +114,37 @@ public class ChatService {
                 userMetadata(riskLevel, safetySignals)
         ));
 
-        String answer = geminiService.askWithContext(request.message(), conversationContext);
-        ChatMessage aiMessage = chatMessageRepository.save(new ChatMessage(
+        List<Long> safetyAlertIds = saveSafetyAlerts(request.pregnancyId(), userMessage.getId(), safetySignals);
+
+        return new ChatMessagePreparation(
+                pregnancy.getId(),
                 session.getId(),
+                userMessage.getId(),
+                request.message(),
+                conversationContext,
+                riskLevel,
+                safetySignals.stream().map(SafetySignal::alertType).toList(),
+                safetyAlertIds
+        );
+    }
+
+    private ChatAiPersistence saveAiResponse(ChatMessagePreparation preparation, String answer) {
+        ChatMessage aiMessage = chatMessageRepository.save(new ChatMessage(
+                preparation.sessionId(),
                 SenderType.AI,
                 answer,
-                aiMetadata(riskLevel, userMessage.getId())
+                aiMetadata(preparation.riskLevel(), preparation.userMessageId())
         ));
 
-        List<Long> safetyAlertIds = saveSafetyAlerts(request.pregnancyId(), userMessage.getId(), safetySignals);
         AiReport aiReport = aiReportRepository.save(new AiReport(
-                request.pregnancyId(),
+                preparation.pregnancyId(),
                 "CHAT_SUMMARY",
                 "AI 채팅 상태 요약",
-                buildReportContent(request.message(), answer, riskLevel, safetySignals),
+                buildReportContent(preparation.userMessage(), answer, preparation.riskLevel(), preparation.safetySignalTypes()),
                 geminiService.getModel()
         ));
 
-        return new ChatMessageResponse(
-                session.getId(),
-                userMessage.getId(),
-                aiMessage.getId(),
-                answer,
-                riskLevel,
-                safetyAlertIds,
-                aiReport.getId()
-        );
+        return new ChatAiPersistence(aiMessage.getId(), aiReport.getId());
     }
 
     @Transactional(readOnly = true)
@@ -223,15 +254,15 @@ public class ChatService {
         return alertIds;
     }
 
-    private String buildReportContent(String userMessage, String answer, String riskLevel, List<SafetySignal> safetySignals) {
+    private String buildReportContent(String userMessage, String answer, String riskLevel, List<String> safetySignalTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append("위험도: ").append(riskLevel).append(System.lineSeparator());
         builder.append("사용자 메시지: ").append(userMessage).append(System.lineSeparator());
         builder.append("AI 응답: ").append(answer).append(System.lineSeparator());
 
-        if (!safetySignals.isEmpty()) {
+        if (!safetySignalTypes.isEmpty()) {
             builder.append("감지된 위험 신호: ");
-            builder.append(safetySignals.stream().map(SafetySignal::alertType).toList());
+            builder.append(safetySignalTypes);
         }
 
         return builder.toString();
@@ -266,5 +297,23 @@ public class ChatService {
     private String createNextCursor(List<ChatMessage> messages, ChatMessageCursorCodec cursorCodec) {
         ChatMessage lastMessage = messages.get(messages.size() - 1);
         return cursorCodec.encode(lastMessage.getCreatedAt(), lastMessage.getId());
+    }
+
+    private record ChatMessagePreparation(
+            Long pregnancyId,
+            Long sessionId,
+            Long userMessageId,
+            String userMessage,
+            String conversationContext,
+            String riskLevel,
+            List<String> safetySignalTypes,
+            List<Long> safetyAlertIds
+    ) {
+    }
+
+    private record ChatAiPersistence(
+            Long aiMessageId,
+            Long aiReportId
+    ) {
     }
 }
