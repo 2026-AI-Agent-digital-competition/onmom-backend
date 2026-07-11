@@ -9,6 +9,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,6 +37,50 @@ public class GeminiService {
 
     public String ask(String message) {
         return askWithContext(message, "");
+    }
+
+    public String createFamilyInsight(String sourceText) {
+        return askWithContext("""
+                아래 산모의 말을 가족이 이해하기 쉽게 변환해줘.
+
+                출력 형식은 반드시 아래 3개 구역만 사용해.
+                [이렇게 말했어요]
+                산모의 말을 짧게 요약
+
+                [AI가 분석한 상태]
+                감정과 상황을 가족이 이해할 수 있게 설명. 단, 진단/처방 금지.
+
+                [이렇게 말해봐요]
+                가족이 산모에게 보내면 좋은 따뜻한 한두 문장.
+
+                산모의 말:
+                %s
+                """.formatted(sourceText), "");
+    }
+
+    public String createEmotionReport(LocalDate recordDate, Integer moodScore, String moodLabel, String noteText) {
+        return askWithContext("""
+                아래 산모의 날짜별 감정 기록을 바탕으로 앱에서 보여줄 AI 리포트를 작성해줘.
+
+                날짜: %s
+                감정 점수: %s/5
+                감정 라벨: %s
+                메모: %s
+
+                작성 규칙:
+                - 진단하거나 치료/처방하지 마.
+                - 산모가 느낀 감정을 먼저 공감해.
+                - 가능한 원인은 "그럴 수 있어요" 수준으로만 설명해.
+                - 오늘 해볼 수 있는 아주 가벼운 자기돌봄 행동을 2~3개 제안해.
+                - 출혈, 심한 복통, 태동 감소, 고열, 심한 두통, 시야 이상, 호흡곤란, 자해 생각이 있으면 병원/주치의/응급 상담을 권장해.
+                - 가족에게 공유하면 좋은 한 문장을 포함해.
+                - 한국어로 5~8문장 정도로 작성해.
+                """.formatted(
+                recordDate,
+                moodScore,
+                moodLabel,
+                noteText == null || noteText.isBlank() ? "없음" : noteText
+        ), "");
     }
 
     public String askWithContext(String message, String conversationContext) {

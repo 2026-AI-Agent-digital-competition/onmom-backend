@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
@@ -50,12 +51,67 @@ public class AiReport {
         this.modelName = modelName;
     }
 
+    public AiReport(
+            Long pregnancyId,
+            Long emotionRecordId,
+            String reportType,
+            String title,
+            String content,
+            String modelName
+    ) {
+        this.pregnancyId = pregnancyId;
+        this.emotionRecordId = emotionRecordId;
+        this.reportType = reportType;
+        this.title = title;
+        this.content = content;
+        this.modelName = modelName;
+    }
+
     @PrePersist
     void prePersist() {
         this.generatedAt = LocalDateTime.now();
     }
 
+    @PreUpdate
+    void preUpdate() {
+        this.generatedAt = LocalDateTime.now();
+    }
+
+    public void update(String title, String content, String modelName) {
+        this.title = title;
+        this.content = content;
+        this.modelName = modelName;
+    }
+
     public Long getId() {
         return id;
+    }
+
+    public Long getPregnancyId() {
+        return pregnancyId;
+    }
+
+    public Long getEmotionRecordId() {
+        return emotionRecordId;
+    }
+
+    public String getReportType() {
+        return reportType;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public String getModelName() {
+        return modelName;
+    }
+
+    public LocalDateTime getGeneratedAt() {
+        return generatedAt;
     }
 }

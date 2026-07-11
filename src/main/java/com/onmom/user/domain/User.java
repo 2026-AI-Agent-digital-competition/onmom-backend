@@ -73,4 +73,8 @@ public class User {
     public UserRole getPrimaryRole() {
         return primaryRole;
     }
+
+    public UserStatus getStatus() {
+        return status;
+    }
 }

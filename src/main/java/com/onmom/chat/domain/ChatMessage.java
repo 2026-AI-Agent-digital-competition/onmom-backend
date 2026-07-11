@@ -67,8 +67,16 @@ public class ChatMessage {
         return senderType;
     }
 
+    public String getMessageType() {
+        return messageType;
+    }
+
     public String getContent() {
         return content;
+    }
+
+    public String getMetadata() {
+        return metadata;
     }
 
     public LocalDateTime getCreatedAt() {

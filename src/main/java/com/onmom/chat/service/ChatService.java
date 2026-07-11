@@ -6,8 +6,12 @@ import com.onmom.ai.service.GeminiService;
 import com.onmom.chat.domain.ChatMessage;
 import com.onmom.chat.domain.ChatSession;
 import com.onmom.chat.domain.SenderType;
+import com.onmom.chat.dto.ChatCursorPageResponse;
+import com.onmom.chat.dto.ChatMessageItemResponse;
+import com.onmom.chat.dto.ChatMessageListResponse;
 import com.onmom.chat.dto.ChatMessageResponse;
 import com.onmom.chat.dto.CreateChatMessageRequest;
+import com.onmom.chat.repository.ChatMessageQueryRepository;
 import com.onmom.chat.repository.ChatMessageRepository;
 import com.onmom.chat.repository.ChatSessionRepository;
 import com.onmom.global.exception.BusinessException;
@@ -16,8 +20,9 @@ import com.onmom.notification.domain.SafetyAlert;
 import com.onmom.notification.repository.SafetyAlertRepository;
 import com.onmom.pregnancy.domain.Pregnancy;
 import com.onmom.pregnancy.repository.PregnancyRepository;
-import com.onmom.user.domain.UserAccount;
-import com.onmom.user.repository.UserAccountRepository;
+import com.onmom.user.domain.User;
+import com.onmom.user.domain.UserStatus;
+import com.onmom.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,40 +33,49 @@ import java.util.List;
 @Service
 public class ChatService {
 
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
+
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final UserAccountRepository userAccountRepository;
+    private final ChatMessageQueryRepository chatMessageQueryRepository;
+    private final UserRepository userRepository;
     private final PregnancyRepository pregnancyRepository;
     private final SafetyAlertRepository safetyAlertRepository;
     private final AiReportRepository aiReportRepository;
     private final GeminiService geminiService;
     private final SafetySignalDetector safetySignalDetector;
+    private final ChatMessageCursorCodec cursorCodec;
 
     public ChatService(
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
-            UserAccountRepository userAccountRepository,
+            ChatMessageQueryRepository chatMessageQueryRepository,
+            UserRepository userRepository,
             PregnancyRepository pregnancyRepository,
             SafetyAlertRepository safetyAlertRepository,
             AiReportRepository aiReportRepository,
             GeminiService geminiService,
-            SafetySignalDetector safetySignalDetector
+            SafetySignalDetector safetySignalDetector,
+            ChatMessageCursorCodec cursorCodec
     ) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
-        this.userAccountRepository = userAccountRepository;
+        this.chatMessageQueryRepository = chatMessageQueryRepository;
+        this.userRepository = userRepository;
         this.pregnancyRepository = pregnancyRepository;
         this.safetyAlertRepository = safetyAlertRepository;
         this.aiReportRepository = aiReportRepository;
         this.geminiService = geminiService;
         this.safetySignalDetector = safetySignalDetector;
+        this.cursorCodec = cursorCodec;
     }
 
     @Transactional
-    public ChatMessageResponse createMessage(CreateChatMessageRequest request) {
-        validateUser(request.userId());
-        Pregnancy pregnancy = validatePregnancyAccess(request.pregnancyId(), request.userId());
-        ChatSession session = resolveSession(request, pregnancy);
+    public ChatMessageResponse createMessage(Long currentUserId, CreateChatMessageRequest request) {
+        validateUser(currentUserId);
+        Pregnancy pregnancy = validatePregnancyAccess(request.pregnancyId(), currentUserId);
+        ChatSession session = resolveSession(request, pregnancy, currentUserId);
 
         String conversationContext = buildConversationContext(session.getId());
         List<SafetySignal> safetySignals = safetySignalDetector.detect(request.message());
@@ -102,11 +116,50 @@ public class ChatService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public ChatMessageListResponse findMessages(
+            Long currentUserId,
+            Long chatSessionId,
+            String cursor,
+            Integer size
+    ) {
+        validateUser(currentUserId);
+        ChatSession session = chatSessionRepository.findById(chatSessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_SESSION_NOT_FOUND));
+
+        if (!session.getUserId().equals(currentUserId)) {
+            throw new BusinessException(ErrorCode.CHAT_SESSION_NOT_FOUND);
+        }
+
+        int pageSize = normalizeSize(size);
+        ChatMessageCursor decodedCursor = cursorCodec.decode(cursor);
+        List<ChatMessage> messages = chatMessageQueryRepository.findBySessionId(
+                session.getId(),
+                decodedCursor == null ? null : decodedCursor.createdAt(),
+                decodedCursor == null ? null : decodedCursor.id(),
+                pageSize + 1
+        );
+
+        boolean hasNext = messages.size() > pageSize;
+        List<ChatMessage> pageMessages = hasNext ? messages.subList(0, pageSize) : messages;
+        String nextCursor = hasNext ? createNextCursor(pageMessages, cursorCodec) : null;
+
+        List<ChatMessageItemResponse> content = pageMessages.stream()
+                .map(ChatMessageItemResponse::from)
+                .toList();
+
+        return new ChatMessageListResponse(
+                session.getId(),
+                content,
+                new ChatCursorPageResponse(nextCursor, pageSize, hasNext)
+        );
+    }
+
     private void validateUser(Long userId) {
-        UserAccount user = userAccountRepository.findById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if (!"ACTIVE".equals(user.getStatus())) {
+        if (user.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
     }
@@ -126,13 +179,13 @@ public class ChatService {
         return pregnancy;
     }
 
-    private ChatSession resolveSession(CreateChatMessageRequest request, Pregnancy pregnancy) {
+    private ChatSession resolveSession(CreateChatMessageRequest request, Pregnancy pregnancy, Long currentUserId) {
         if (request.chatSessionId() == null) {
-            return chatSessionRepository.save(new ChatSession(pregnancy.getId(), request.userId()));
+            return chatSessionRepository.save(new ChatSession(pregnancy.getId(), currentUserId));
         }
 
         return chatSessionRepository
-                .findByIdAndPregnancyIdAndUserId(request.chatSessionId(), pregnancy.getId(), request.userId())
+                .findByIdAndPregnancyIdAndUserId(request.chatSessionId(), pregnancy.getId(), currentUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_SESSION_NOT_FOUND));
     }
 
@@ -201,5 +254,17 @@ public class ChatService {
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace(System.lineSeparator(), "\\n");
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null || size < 1) {
+            return DEFAULT_SIZE;
+        }
+        return Math.min(size, MAX_SIZE);
+    }
+
+    private String createNextCursor(List<ChatMessage> messages, ChatMessageCursorCodec cursorCodec) {
+        ChatMessage lastMessage = messages.get(messages.size() - 1);
+        return cursorCodec.encode(lastMessage.getCreatedAt(), lastMessage.getId());
     }
 }
