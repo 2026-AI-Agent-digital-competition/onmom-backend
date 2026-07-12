@@ -80,6 +80,18 @@ public class FamilyConnection {
         return pregnancyId;
     }
 
+    public Long getMotherUserId() {
+        return motherUserId;
+    }
+
+    public Long getFamilyUserId() {
+        return familyUserId;
+    }
+
+    public FamilyRelationship getRelationship() {
+        return relationship;
+    }
+
     public FamilyConnectionStatus getStatus() {
         return status;
     }
