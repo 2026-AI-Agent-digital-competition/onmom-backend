@@ -33,7 +33,6 @@ AI agent를 활용한 산모-가족 연결 서비스입니다.
 - Validation
 - Jackson
 - Lombok
-- Docker Compose Support
 
 카카오 로그인은 React가 callback에서 받은 인가 코드를 백엔드에 전달하고, 백엔드가 카카오 access token 발급과 사용자 정보 조회를 수행하는 Authorization Code 방식으로 구현합니다. 로그인 성공 후 백엔드는 자체 access token을 JWT로 발급합니다.
 
@@ -50,6 +49,26 @@ ONMOM_KAKAO_REDIRECT_URI
 `ONMOM_KAKAO_CLIENT_ID`에는 카카오 REST API 키를 설정합니다. React의 callback URI, 카카오 개발자 콘솔에 등록한 redirect URI, `ONMOM_KAKAO_REDIRECT_URI`는 동일해야 합니다. React는 인가 요청 전에 생성한 `state`를 callback에서 검증한 뒤 인가 코드를 백엔드로 전달합니다.
 
 React와 백엔드가 다른 origin이면 `ONMOM_CORS_ALLOWED_ORIGINS`에 허용할 React origin을 쉼표로 구분해 설정합니다. 기본 개발 origin은 `http://localhost:5173`이며 CORS는 `/api/**`에만 적용됩니다.
+
+### 로컬 실행
+
+로컬 MySQL을 직접 사용할 때는 아래 명령으로 실행합니다.
+
+```bash
+./gradlew run
+```
+
+`run` 태스크는 `local` 프로필로 Spring Boot를 실행합니다. 기본 로컬 DB 설정은 다음 환경 변수로 덮어쓸 수 있습니다.
+
+```text
+ONMOM_DATASOURCE_URL
+ONMOM_DATASOURCE_USERNAME
+ONMOM_DATASOURCE_PASSWORD
+```
+
+Spring Boot 표준 환경 변수인 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`도 사용할 수 있습니다.
+
+프로젝트 루트의 `.env` 파일도 `local` 프로필에서 자동으로 읽습니다. `.env`는 git에 포함하지 않습니다.
 
 ## 문서
 
