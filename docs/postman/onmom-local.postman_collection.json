@@ -1,0 +1,800 @@
+{
+  "info": {
+    "_postman_id": "149a2d90-cbb7-41d3-9ed5-1d4377b6c5b3",
+    "name": "Onmom Local API",
+    "description": "Local Postman collection for the currently implemented Onmom backend APIs. Import docs/postman/onmom-local.postman_environment.json and select the Onmom Local environment before running requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 Auth",
+      "item": [
+        {
+          "name": "Dev Auth Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('dev auth is enabled', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.expect(json.data.enabled).to.eql(true);",
+                  "  pm.expect(json.data.jwtSecretConfigured).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dev/auth/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dev",
+                "auth",
+                "status"
+              ]
+            },
+            "description": "Requires server option: --onmom.dev-token.enabled=true"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Mother Dev Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('mother token issued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.expect(json.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('motherToken', json.data.accessToken);",
+                  "  pm.environment.set('motherUserId', String(json.data.userId));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{motherUserId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dev/auth/access-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dev",
+                "auth",
+                "access-token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Family Dev Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('family token issued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.expect(json.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('familyToken', json.data.accessToken);",
+                  "  pm.environment.set('familyUserId', String(json.data.userId));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{familyUserId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dev/auth/access-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dev",
+                "auth",
+                "access-token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Kakao Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('kakao login succeeds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.expect(json.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  if (json.data.role === 'MOTHER') {",
+                  "    pm.environment.set('motherToken', json.data.accessToken);",
+                  "    pm.environment.set('motherUserId', String(json.data.userId));",
+                  "  }",
+                  "  if (json.data.role === 'FAMILY') {",
+                  "    pm.environment.set('familyToken', json.data.accessToken);",
+                  "    pm.environment.set('familyUserId', String(json.data.userId));",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorizationCode\": \"{{kakaoAuthorizationCode}}\",\n  \"role\": \"{{loginRole}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/kakao-login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "kakao-login"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 Pregnancy",
+      "item": [
+        {
+          "name": "Create Pregnancy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('pregnancy created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.environment.set('pregnancyId', String(json.data.id));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motherDisplayName\": \"온맘\",\n  \"babyNickname\": \"튼튼이\",\n  \"pregnancyWeekStart\": 12,\n  \"pregnancyWeekEnd\": 13,\n  \"dueDate\": \"2027-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pregnancies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pregnancies"
+              ]
+            },
+            "description": "A mother can have only one ACTIVE pregnancy. If this returns ALREADY_EXISTS, reuse the existing pregnancy id from DataGrip or reset local data."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 Family Invite",
+      "item": [
+        {
+          "name": "Issue Family Invite Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('invite code issued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.environment.set('inviteCode', json.data.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pregnancies/{{pregnancyId}}/family-invite-codes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pregnancies",
+                "{{pregnancyId}}",
+                "family-invite-codes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Family Invite Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('invite code accepted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.environment.set('pregnancyId', String(json.data.pregnancyId));",
+                  "  pm.environment.set('familyConnectionId', String(json.data.connectionId));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{familyToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{inviteCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/family-invite-codes/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "family-invite-codes",
+                "accept"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 Emotion Records",
+      "item": [
+        {
+          "name": "Create Or Update Emotion Record",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('emotion record saved', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.environment.set('emotionRecordId', String(json.data.id));",
+                  "  if (json.data.aiReportId) {",
+                  "    pm.environment.set('emotionAiReportId', String(json.data.aiReportId));",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pregnancyId\": {{pregnancyId}},\n  \"recordDate\": \"{{recordDate}}\",\n  \"moodScore\": 3,\n  \"moodLabel\": \"불안\",\n  \"noteText\": \"오늘은 몸이 무겁고 마음이 조금 불안했어요.\",\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emotion-records",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emotion-records"
+              ]
+            },
+            "description": "This request calls Gemini through the backend. GEMINI_API_KEY must be configured."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Daily Emotion Record",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emotion-records/daily?pregnancyId={{pregnancyId}}&recordDate={{recordDate}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emotion-records",
+                "daily"
+              ],
+              "query": [
+                {
+                  "key": "pregnancyId",
+                  "value": "{{pregnancyId}}"
+                },
+                {
+                  "key": "recordDate",
+                  "value": "{{recordDate}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Emotion Calendar",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emotion-records/calendar?pregnancyId={{pregnancyId}}&year=2026&month=7",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emotion-records",
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "pregnancyId",
+                  "value": "{{pregnancyId}}"
+                },
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "7"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Emotion AI Report",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emotion-records/{{emotionRecordId}}/ai-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emotion-records",
+                "{{emotionRecordId}}",
+                "ai-report"
+              ]
+            },
+            "description": "This may create a report through Gemini if no report exists yet."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 Chat",
+      "item": [
+        {
+          "name": "Create Chat Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('chat message created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.environment.set('chatSessionId', String(json.data.chatSessionId));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pregnancyId\": {{pregnancyId}},\n  \"chatSessionId\": null,\n  \"message\": \"오늘 배가 조금 당기고 불안해요. 어떻게 하면 좋을까요?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat-messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat-messages"
+              ]
+            },
+            "description": "This request calls Gemini through the backend. GEMINI_API_KEY must be configured."
+          },
+          "response": []
+        },
+        {
+          "name": "List Chat Session Messages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('chat messages listed', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  if (json.data.page && json.data.page.nextCursor) {",
+                  "    pm.environment.set('chatCursor', json.data.page.nextCursor);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat-sessions/{{chatSessionId}}/messages?size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat-sessions",
+                "{{chatSessionId}}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 Family Insight And Messages",
+      "item": [
+        {
+          "name": "Create Family Insight",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('family insight created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  pm.environment.set('translationId', String(json.data.translationId));",
+                  "  if (json.data.familyMessageIds && json.data.familyMessageIds.length > 0) {",
+                  "    pm.environment.set('familyMessageId', String(json.data.familyMessageIds[0]));",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{motherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pregnancyId\": {{pregnancyId}},\n  \"recipientUserId\": {{familyUserId}},\n  \"sourceText\": \"오늘은 몸도 마음도 지쳐서 가족에게 따뜻한 말을 듣고 싶어요.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/family-insights",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "family-insights"
+              ]
+            },
+            "description": "Requires a CONNECTED family relationship and GEMINI_API_KEY."
+          },
+          "response": []
+        },
+        {
+          "name": "List Received Family Messages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('family messages listed', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.eql('SUCCESS');",
+                  "  if (json.data.page && json.data.page.nextCursor) {",
+                  "    pm.environment.set('familyMessageCursor', json.data.page.nextCursor);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{familyToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/family-messages?size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "family-messages"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('response is json', function () {",
+          "  pm.response.to.have.header('Content-Type');",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8080"
+    }
+  ]
+}
