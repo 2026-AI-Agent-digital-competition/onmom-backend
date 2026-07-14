@@ -70,6 +70,16 @@ Spring Boot 표준 환경 변수인 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_
 
 프로젝트 루트의 `.env` 파일도 `local` 프로필에서 자동으로 읽습니다. `.env`는 git에 포함하지 않습니다.
 
+### EC2 배포
+
+시연용 Docker Hub → Ubuntu EC2 수동 배포는 [EC2 시연 배포 가이드](docs/demo-ec2-deployment.md)를 따릅니다.
+도메인, HTTPS, CI/CD 없이 `http://EC2_IP:8080`에서 앱을 확인하는 최소 구성입니다.
+
+### Cloudtype 배포
+
+Cloudtype의 Dockerfile 서비스와 같은 프로젝트의 MariaDB를 사용하는 배포는
+[Cloudtype 배포 가이드](docs/cloudtype-deployment.md)를 따릅니다.
+
 ## 문서
 
 개발 전 아래 문서를 먼저 읽어주세요.
