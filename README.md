@@ -45,6 +45,8 @@ ONMOM_CORS_ALLOWED_ORIGINS
 ONMOM_KAKAO_CLIENT_ID
 ONMOM_KAKAO_CLIENT_SECRET
 ONMOM_KAKAO_REDIRECT_URI
+GEMINI_API_KEY
+ONMOM_DEV_TOKEN_ENABLED
 ```
 
 `ONMOM_KAKAO_CLIENT_ID`에는 카카오 REST API 키를 설정합니다. React의 callback URI, 카카오 개발자 콘솔에 등록한 redirect URI, `ONMOM_KAKAO_REDIRECT_URI`는 동일해야 합니다. React는 인가 요청 전에 생성한 `state`를 callback에서 검증한 뒤 인가 코드를 백엔드로 전달합니다.
@@ -203,6 +205,330 @@ Content-Type: application/json
   }
 }
 ```
+
+### AI 채팅 메시지 생성
+
+```http
+POST /api/v1/chat-messages
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "pregnancyId": 1,
+  "chatSessionId": null,
+  "message": "아침부터 계속 눈물이 나고 태동도 줄어든 것 같아요."
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "chatSessionId": 1,
+    "userMessageId": 10,
+    "aiMessageId": 11,
+    "answer": "아침부터 눈물이 나고 태동까지 줄어든 것 같아 많이 걱정되셨겠어요...",
+    "riskLevel": "긴급",
+    "safetyAlertIds": [1],
+    "aiReportId": 1
+  }
+}
+```
+
+산모 본인의 `ACTIVE` 임신 프로필에 대해서만 메시지를 생성할 수 있습니다. 서버는 사용자 메시지와 위험 신호를 먼저 저장한 뒤 Gemini를 호출하며, AI 응답 생성에 성공하면 AI 메시지와 채팅 요약 리포트를 저장합니다. Gemini 요청에는 `store=false`를 명시해 외부 보관을 비활성화합니다.
+
+저장 테이블:
+
+```text
+chat_sessions
+chat_messages
+safety_alerts
+ai_reports
+```
+
+### AI 채팅 메시지 목록 조회
+
+```http
+GET /api/v1/chat-sessions/{chatSessionId}/messages?size=20&cursor={cursor}
+Authorization: Bearer {accessToken}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "chatSessionId": 1,
+    "content": [
+      {
+        "id": 11,
+        "chatSessionId": 1,
+        "senderType": "AI",
+        "messageType": "TEXT",
+        "content": "아침부터 눈물이 나고...",
+        "metadata": "{\"riskLevel\":\"긴급\",\"sourceMessageId\":10}",
+        "createdAt": "2026-07-11T17:16:47.464"
+      }
+    ],
+    "page": {
+      "nextCursor": null,
+      "size": 20,
+      "hasNext": false
+    }
+  }
+}
+```
+
+목록은 `createdAt desc, id desc` 기준 cursor pagination을 사용합니다.
+
+### 날짜별 감정 기록 생성/수정
+
+```http
+POST /api/v1/emotion-records
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "pregnancyId": 1,
+  "recordDate": "2026-07-11",
+  "moodScore": 2,
+  "moodLabel": "불안",
+  "noteText": "오늘 마음이 불안하고 눈물이 난다.",
+  "source": "MANUAL"
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "id": 1,
+    "pregnancyId": 1,
+    "userId": 1,
+    "recordDate": "2026-07-11",
+    "moodScore": 2,
+    "moodLabel": "불안",
+    "moodEmoji": "😟",
+    "noteText": "오늘 마음이 불안하고 눈물이 난다.",
+    "source": "MANUAL",
+    "aiReportId": 2,
+    "createdAt": "2026-07-11T17:30:00.000",
+    "updatedAt": "2026-07-11T17:30:00.000"
+  }
+}
+```
+
+같은 `pregnancyId`와 `recordDate`의 기록이 이미 있으면 새로 만들지 않고 기존 기록을 갱신합니다. 감정 기록 저장 시 Gemini 기반 일일 감정 리포트를 생성해 `ai_reports`에 저장합니다.
+
+저장 테이블:
+
+```text
+emotion_records
+ai_reports
+```
+
+### 날짜별 감정 기록 조회
+
+```http
+GET /api/v1/emotion-records/daily?pregnancyId=1&recordDate=2026-07-11
+Authorization: Bearer {accessToken}
+```
+
+산모 본인의 특정 날짜 감정 기록을 조회합니다.
+
+### 월별 감정 달력 조회
+
+```http
+GET /api/v1/emotion-records/calendar?pregnancyId=1&year=2026&month=7
+Authorization: Bearer {accessToken}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "pregnancyId": 1,
+    "year": 2026,
+    "month": 7,
+    "days": [
+      {
+        "emotionRecordId": 1,
+        "recordDate": "2026-07-11",
+        "moodScore": 2,
+        "moodLabel": "불안",
+        "moodEmoji": "😟",
+        "hasAiReport": true,
+        "aiReportId": 2
+      }
+    ]
+  }
+}
+```
+
+프론트엔드는 `days`의 `recordDate`와 `moodEmoji`를 이용해 날짜별 이모티콘 달력을 구성할 수 있습니다.
+
+### 감정 기록 AI 리포트 조회
+
+```http
+GET /api/v1/emotion-records/{emotionRecordId}/ai-report
+Authorization: Bearer {accessToken}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "aiReportId": 2,
+    "emotionRecordId": 1,
+    "reportType": "EMOTION_DAILY_REPORT",
+    "title": "불안 감정 리포트",
+    "content": "오늘 불안한 마음이 크게 느껴지셨군요...",
+    "modelName": "gemini-2.5-flash",
+    "generatedAt": "2026-07-11T17:30:00.000"
+  }
+}
+```
+
+감정 기록을 눌렀을 때 보여줄 AI 리포트 상세 조회 API입니다.
+
+### 가족 AI 인사이트 생성
+
+```http
+POST /api/v1/family-insights
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+요청:
+
+```json
+{
+  "pregnancyId": 1,
+  "recipientUserId": 2,
+  "sourceText": "오늘 너무 불안하고 계속 눈물이 나. 혼자 있는 게 힘들어."
+}
+```
+
+`recipientUserId`를 생략하면 해당 임신 프로필에 연결된 모든 가족에게 메시지를 생성합니다.
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "translationId": 1,
+    "sourceSummary": "산모가 불안과 외로움을 표현했습니다.",
+    "aiInterpretation": "정서적으로 지쳐 있고 가까운 지지가 필요한 상태로 보입니다.",
+    "suggestedMessage": "많이 힘들었겠다. 내가 곁에서 같이 들어줄게.",
+    "familyMessageIds": [1],
+    "notificationIds": [1]
+  }
+}
+```
+
+산모의 입력을 가족이 이해하기 쉬운 `요약 / 상태 해석 / 말해볼 문장` 구조로 변환합니다.
+
+저장 테이블:
+
+```text
+emotion_translations
+family_messages
+notifications
+```
+
+### 가족 메시지 목록 조회
+
+```http
+GET /api/v1/family-messages?size=20&cursor={cursor}
+Authorization: Bearer {accessToken}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "content": [
+      {
+        "id": 1,
+        "pregnancyId": 1,
+        "senderUserId": 1,
+        "recipientUserId": 2,
+        "translationId": 1,
+        "messageType": "AI_INSIGHT",
+        "content": "이렇게 말했어요\n산모가 불안과 외로움을 표현했습니다...",
+        "status": "CREATED",
+        "createdAt": "2026-07-11T17:40:00.000"
+      }
+    ],
+    "page": {
+      "nextCursor": null,
+      "size": 20,
+      "hasNext": false
+    }
+  }
+}
+```
+
+가족 사용자가 자신에게 전달된 가족 메시지를 조회합니다. 목록은 cursor pagination을 사용합니다.
+
+### 로컬 개발용 JWT 발급
+
+```http
+GET /api/v1/dev/auth/status
+POST /api/v1/dev/auth/access-token
+```
+
+로컬 테스트에서 카카오 로그인 없이 JWT를 발급하기 위한 개발용 API입니다. 아래 설정이 있을 때만 활성화됩니다.
+
+```text
+ONMOM_DEV_TOKEN_ENABLED=true
+ONMOM_JWT_SECRET=local-test-secret
+```
+
+요청:
+
+```json
+{
+  "userId": 1
+}
+```
+
+응답:
+
+```json
+{
+  "result": "SUCCESS",
+  "data": {
+    "userId": 1,
+    "role": "MOTHER",
+    "tokenType": "Bearer",
+    "accessToken": "jwt-access-token",
+    "expiresIn": 3600
+  }
+}
+```
+
+운영 환경에서는 `ONMOM_DEV_TOKEN_ENABLED`를 설정하지 않거나 `false`로 둡니다.
 
 ## 권장 패키지 구조
 
